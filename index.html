@@ -184,6 +184,36 @@
   .back-opt.on .sw { outline: 3px solid var(--md-primary); outline-offset: 3px; }
   .back-opt.on { color: var(--md-on-surface); font-weight: 500; }
   .dialog .lbl { font-size: 14px; color: var(--md-on-surface-variant); margin: 0 0 6px; }
+  /* Title: app mark + name, in the theme's primary tones */
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark { width: 38px; height: 38px; border-radius: 12px; background: var(--md-primary-container); flex: none; display: block; }
+  .brand .mark svg { width: 38px; height: 38px; display: block; }
+  .brand .m-back { fill: var(--md-primary); opacity: .55; }
+  .brand .m-card { fill: #FFFFFF; stroke: var(--md-primary); stroke-width: 1.2; }
+  .brand .m-suit { fill: var(--md-primary); }
+  .brand .words { display: flex; flex-direction: column; line-height: 1; }
+  .brand .name { font-size: 22px; font-weight: 500; letter-spacing: -.2px; color: var(--md-on-surface); }
+  .brand .kind { font-size: 11px; font-weight: 500; letter-spacing: 1.6px; text-transform: uppercase; color: var(--md-primary); margin-top: 4px; }
+  /* Landscape phones: one slim top row holds everything, the rest is table */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .app { max-width: none; padding: 2px 10px 8px; display: grid; gap: 0 6px;
+      grid-template-columns: auto minmax(0, 1fr) auto auto auto auto; grid-template-rows: 52px minmax(0, 1fr); align-items: center; }
+    .topbar { display: contents; }
+    .topbar h1 { grid-column: 1; grid-row: 1; padding: 0 6px 0 4px; }
+    #statsBtn { grid-column: 4; grid-row: 1; } #setBtn { grid-column: 5; grid-row: 1; } #helpBtn { grid-column: 6; grid-row: 1; }
+    .status { grid-column: 2; grid-row: 1; margin: 0; align-items: center; justify-content: flex-start; gap: 12px; min-width: 0; }
+    .status > div:first-child { min-width: 0; }
+    .game-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stats { gap: 10px; }
+    .actions { grid-column: 3; grid-row: 1; margin: 0; flex-wrap: nowrap; gap: 4px; padding-right: 2px; }
+    .actions .btn { height: 36px; padding: 0 14px; }
+    .table-wrap { grid-column: 1 / -1; grid-row: 2; align-self: stretch; height: 100%; border-radius: 20px; }
+  }
+  /* narrower landscape: tonal buttons show their icon only */
+  @media (orientation: landscape) and (max-height: 560px) and (max-width: 940px) {
+    .actions .btn.tonal { width: 40px; padding: 0; justify-content: center; font-size: 0; gap: 0; }
+    .actions .btn.tonal svg { width: 20px; height: 20px; }
+  }
   .dialog .credits { font-size: 12px; text-align: center; margin: 14px 0 0; }
   .dialog .credits a { color: var(--md-primary); }
 </style>
@@ -198,7 +228,14 @@
 
 <div class="app">
   <header class="topbar">
-    <h1>Spider</h1>
+    <h1 class="brand">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 36 36">
+        <rect x="9" y="5" width="17" height="24" rx="3.5" transform="rotate(-12 17.5 17)" class="m-back"/>
+        <rect x="11" y="7" width="17" height="24" rx="3.5" transform="rotate(8 19.5 19)" class="m-card"/>
+        <path transform="translate(12.6 12.3) scale(.56) rotate(8 12 12)" class="m-suit" d="M12 1.8c-2.7 4-8.6 7.2-8.6 11.6 0 2.6 2 4.6 4.6 4.6 1.4 0 2.6-.6 3.2-1.4-.3 1.9-1.1 3.4-2.7 4.6h7c-1.6-1.2-2.4-2.7-2.7-4.6.6.8 1.8 1.4 3.2 1.4 2.6 0 4.6-2 4.6-4.6 0-4.4-5.9-7.6-8.6-11.6z"/>
+      </svg></span>
+      <span class="words"><span class="name">Spider</span><span class="kind">Solitaire</span></span>
+    </h1>
     <button class="icon-btn" id="statsBtn" aria-label="Statistics">
       <svg class="i" viewBox="0 0 24 24"><path d="M16 11V3H8v6H2v12h20V11h-6zm-6-6h4v14h-4V5zm-6 6h4v8H4v-8zm16 8h-4v-6h4v6z"/></svg>
     </button>
@@ -224,9 +261,9 @@
   <div class="table-wrap" id="wrap"><div class="table" id="table"></div></div>
 
   <div class="actions">
-    <button class="btn tonal" id="undoBtn"><svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>Undo</button>
-    <button class="btn tonal" id="hintBtn"><svg viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>Hint</button>
-    <button class="btn tonal" id="restartBtn"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>Restart</button>
+    <button class="btn tonal" id="undoBtn" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>Undo</button>
+    <button class="btn tonal" id="hintBtn" aria-label="Hint"><svg viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>Hint</button>
+    <button class="btn tonal" id="restartBtn" aria-label="Restart"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>Restart</button>
     <button class="btn filled" id="newBtn"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>New game</button>
   </div>
 </div>
@@ -546,21 +583,29 @@
     });
   }
 
+  // same condition as the landscape CSS: a phone turned sideways
+  const LANDSCAPE_PHONE = matchMedia('(orientation: landscape) and (max-height: 560px)');
   function computeLayout() {
     const W = wrap.clientWidth, H = wrap.clientHeight;
+    // Wide, short screens (phones in landscape): finished piles on the left, stock on the right,
+    // so the columns get the full height.
+    const side = LANDSCAPE_PHONE.matches;
+    const n = side ? COLS + 2 : COLS;
     let gap = Math.max(3, Math.min(12, W * 0.011));
-    let cw = (W - gap * (COLS + 1)) / COLS;
-    cw = Math.min(cw, H / (1.4 * 3.3), 100);
+    let cw = (W - gap * (n + 1) - (side ? gap * 2 : 0)) / n;
+    cw = Math.min(cw, side ? H / (1.4 * 2.6) : H / (1.4 * 3.3), 100);
     gap = Math.max(3, Math.min(14, cw * 0.12));
     const ch = cw * 1.4;
-    const total = cw * COLS + gap * (COLS - 1);
+    const total = cw * n + gap * (n - 1) + (side ? gap * 2 : 0);
     const x0 = (W - total) / 2, y0 = Math.max(gap, 8);
-    L = { W, H, gap, cw, ch, x0, y0, tabTop: y0 + ch + gap * 1.6 };
+    L = { W, H, gap, cw, ch, x0, y0, side, tabTop: side ? y0 : y0 + ch + gap * 1.6 };
     table.style.setProperty('--cw', cw + 'px');
     table.style.setProperty('--ch', ch + 'px');
   }
-  const colX = c => L.x0 + c * (L.cw + L.gap);
-  const stockX = () => colX(COLS - 1);
+  // tableau column c (in side mode column -1 is the finished piles, column COLS the stock)
+  const colX = c => L.side ? L.x0 + (c + 1) * (L.cw + L.gap) + (c >= 0 ? L.gap : 0) + (c >= COLS ? L.gap : 0) : L.x0 + c * (L.cw + L.gap);
+  const stockX = () => L.side ? colX(COLS) : colX(COLS - 1);
+  const foundPos = f => L.side ? [colX(-1), L.y0 + f * Math.min(L.ch * 0.32, (L.H - L.y0 * 2 - L.ch) / 7)] : [colX(f), L.y0];
   // Face-down cards sit close together; face-up cards show their corner.
   function fan(c) {
     const col = S.cols[c], nd = Math.min(S.up[c], col.length), nu = col.length - nd;
@@ -614,7 +659,7 @@
     if (opts.instant) table.classList.add('no-anim');
     const seen = new Array(N).fill(false);
     const box = (el, x, y) => Object.assign(el.style, { left: x + 'px', top: y + 'px', width: L.cw + 'px', height: L.ch + 'px' });
-    for (let i = 0; i < 8; i++) box(slotEl.found[i], colX(i), L.y0);
+    for (let i = 0; i < 8; i++) { box(slotEl.found[i], ...foundPos(i)); slotEl.found[i].style.display = L.side && i > S.found.length ? 'none' : ''; }
     box(slotEl.stock, stockX(), L.y0);
     S.cols.forEach((col, c) => {
       box(slotEl.col[c], colX(c), L.tabTop);
@@ -625,10 +670,12 @@
     const groups = S.stock.length / COLS, off = Math.min(L.cw * 0.22, (L.cw + L.gap) / 4);
     S.stock.forEach((id, k) => {
       const g = Math.floor(k / COLS);
-      place(cardEl[id], stockX() - (groups - 1 - g) * off, L.y0, 50 + k, false); seen[id] = true;
+      if (L.side) place(cardEl[id], stockX(), L.y0 + (groups - 1 - g) * off * 1.3, 50 + k, false);
+      else place(cardEl[id], stockX() - (groups - 1 - g) * off, L.y0, 50 + k, false);
+      seen[id] = true;
     });
     // finished runs, King on top
-    S.found.forEach((run, f) => run.forEach((id, k) => { place(cardEl[id], colX(f), L.y0, 30 - k, true); seen[id] = true; }));
+    S.found.forEach((run, f) => run.forEach((id, k) => { const [fx, fy] = foundPos(f); place(cardEl[id], fx, fy, 30 + f * 13 - k + 12, true); seen[id] = true; }));
     cardEl.forEach((el, id) => { if (!seen[id]) el.style.display = 'none'; el.style.transform = ''; el.classList.remove('dragging'); });
     if (opts.instant) { void table.offsetWidth; table.classList.remove('no-anim'); }
   }
@@ -642,7 +689,8 @@
   }
   function targetAt(x, y) {
     const r = table.getBoundingClientRect(); x -= r.left; y -= r.top;
-    const c = Math.floor((x - L.x0 + L.gap / 2) / (L.cw + L.gap));
+    let c = -1;
+    for (let k = 0; k < COLS; k++) if (x >= colX(k) - L.gap / 2 && x < colX(k) + L.cw + L.gap / 2) c = k;
     if (c < 0 || c >= COLS || y < L.tabTop - L.gap) return null;
     return { c };
   }
@@ -814,7 +862,7 @@
     const deals = S.stock.length / COLS;
     document.getElementById('gameNo').textContent = `Game #${S.game}`;
     document.getElementById('gameSub').textContent = S.won ? `${suitsTxt(S.n)} · Solved`
-      : `${suitsTxt(S.n)} · ${S.found.length} of 8 runs · ${deals ? deals + (deals === 1 ? ' deal' : ' deals') + ' left' : 'no deals left'}`;
+      : `${suitsTxt(S.n)} · ${S.found.length}/8 runs · ${deals ? deals + (deals === 1 ? ' deal' : ' deals') + ' left' : 'no deals left'}`;
     document.getElementById('sMoves').textContent = S.moves;
     document.getElementById('sTime').textContent = fmtTime(S.elapsed);
     document.getElementById('undoBtn').disabled = S.won || !history.length;
