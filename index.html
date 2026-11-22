@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#FEF7FF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141218" media="(prefers-color-scheme: dark)">
+<title>Spider</title>
+<meta name="description" content="Spider solitaire with 1, 2 or 4 suits, numbered deals, undo, hints and statistics. Works offline.">
+<meta name="author" content="Meyzenworks">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Spider">
+<style>
+  :root {
+    --md-primary: #6750A4; --md-on-primary: #FFFFFF;
+    --md-primary-container: #EADDFF; --md-on-primary-container: #21005D;
+    --md-secondary-container: #E8DEF8; --md-on-secondary-container: #1D192B;
+    --md-surface: #FEF7FF; --md-on-surface: #1D1B20; --md-on-surface-variant: #49454F;
+    --md-surface-container-low: #F7F2FA; --md-surface-container: #F3EDF7;
+    --md-surface-container-high: #ECE6F0; --md-surface-container-highest: #E6E0E9;
+    --md-outline: #79747E; --md-outline-variant: #CAC4D0; --md-scrim: rgba(0,0,0,.32);
+    --table: #EFE9F4; --slot: #E3DCEA;
+    --card: #FFFBFE; --card-edge: rgba(29,27,32,.10);
+    --ink-red: #B3261E; --ink-black: #1D1B20;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --md-primary: #D0BCFF; --md-on-primary: #381E72;
+      --md-primary-container: #4F378B; --md-on-primary-container: #EADDFF;
+      --md-secondary-container: #4A4458; --md-on-secondary-container: #E8DEF8;
+      --md-surface: #141218; --md-on-surface: #E6E0E9; --md-on-surface-variant: #CAC4D0;
+      --md-surface-container-low: #1D1B20; --md-surface-container: #211F26;
+      --md-surface-container-high: #2B2930; --md-surface-container-highest: #36343B;
+      --md-outline: #938F99; --md-outline-variant: #49454F; --md-scrim: rgba(0,0,0,.55);
+      --table: #1D1B20; --slot: #2B2930;
+      --card: #F4EFF7; --card-edge: rgba(0,0,0,.25);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body {
+    font-family: Roboto, "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--md-surface); color: var(--md-on-surface);
+    user-select: none; -webkit-user-select: none;
+  }
+  .app { height: 100%; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; padding: 4px 12px 14px; }
+  svg.i { width: 24px; height: 24px; fill: currentColor; display: block; }
+
+  .topbar { height: 56px; display: flex; align-items: center; gap: 4px; padding: 0 4px; }
+  .topbar h1 { font-size: 22px; font-weight: 400; margin: 0; flex: 1; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 20px; border: none; background: transparent;
+    color: var(--md-on-surface-variant); cursor: pointer; position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .status { display: flex; justify-content: space-between; align-items: flex-end; margin: 2px 6px 10px; }
+  .game-no { font-size: 16px; font-weight: 500; }
+  .game-sub { font-size: 13px; color: var(--md-on-surface-variant); margin-top: 2px; }
+  .stats { display: flex; gap: 18px; text-align: right; }
+  .stat .v { font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 11px; color: var(--md-on-surface-variant); letter-spacing: .5px; text-transform: uppercase; }
+
+  .table-wrap { flex: 1; min-height: 0; background: var(--table); border-radius: 24px; position: relative; overflow: hidden; }
+  .table { position: absolute; inset: 0; touch-action: none; }
+
+  .slot { position: absolute; border-radius: calc(var(--cw) * .1); background: var(--slot); display: flex; align-items: center; justify-content: center; }
+  .slot svg { width: calc(var(--cw) * .42); height: calc(var(--cw) * .42); fill: var(--md-on-surface-variant); opacity: .28; }
+  .slot.col { background: transparent; border: 1.5px dashed var(--md-outline-variant); }
+
+  .card {
+    position: absolute; width: var(--cw); height: var(--ch);
+    border-radius: calc(var(--cw) * .1); background: var(--card);
+    box-shadow: 0 0 0 1px var(--card-edge), 0 1px 2px rgba(0,0,0,.18);
+    cursor: pointer; color: var(--ink-black);
+  }
+  .card.red { color: var(--ink-red); }
+  /* Motion: short slides using Material's emphasized-decelerate easing */
+  .card { transition: left .22s cubic-bezier(.05,.7,.1,1), top .22s cubic-bezier(.05,.7,.1,1), transform .22s cubic-bezier(.05,.7,.1,1); }
+  .card.dragging, .table.no-anim .card { transition: none; }
+  @keyframes nudge { 0%, 100% { translate: 0 0; } 30% { translate: -4px 0; } 70% { translate: 4px 0; } }
+  .card.nudge { animation: nudge .2s ease-in-out; }
+  .hint { transition: outline-color .2s; }
+  @media (prefers-reduced-motion: reduce) { .card { transition: none !important; animation: none !important; } }
+  .card .idx {
+    position: absolute; left: calc(var(--cw) * .09); top: calc(var(--cw) * .07);
+    display: flex; align-items: center; gap: calc(var(--cw) * .02);
+    font-size: calc(var(--cw) * .33); font-weight: 600; line-height: 1; letter-spacing: -.04em;
+  }
+  .card .idx svg { width: calc(var(--cw) * .26); height: calc(var(--cw) * .26); fill: currentColor; }
+  .card .pip { position: absolute; left: 0; right: 0; bottom: calc(var(--cw) * .14); display: flex; justify-content: center; align-items: flex-end; }
+  .card .pip svg { width: calc(var(--cw) * .56); height: calc(var(--cw) * .56); fill: currentColor; }
+  .card .face { font-size: calc(var(--cw) * .58); font-weight: 300; line-height: .9; }
+  .card.dragging { box-shadow: 0 0 0 1px var(--card-edge), 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3); }
+  .hint { outline: 3px solid var(--md-primary); outline-offset: 1px; }
+
+  .actions { display: flex; justify-content: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .btn {
+    height: 40px; padding: 0 18px 0 14px; border-radius: 20px; border: none; cursor: pointer;
+    font: 500 14px inherit; font-family: inherit; letter-spacing: .1px; position: relative; overflow: hidden;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn svg { width: 18px; height: 18px; fill: currentColor; }
+  @media (max-width: 430px) {
+    .actions { gap: 6px; flex-wrap: nowrap; }
+    .btn { padding: 0 12px 0 9px; gap: 6px; }
+  }
+  .btn.tonal { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+  .btn.filled { background: var(--md-primary); color: var(--md-on-primary); }
+  .btn.text { background: transparent; color: var(--md-primary); padding: 0 12px; }
+  .btn:disabled { opacity: .38; cursor: default; }
+  .btn::after, .icon-btn::after {
+    content: ""; position: absolute; inset: 0; background: currentColor; opacity: 0; transition: opacity .15s; pointer-events: none;
+  }
+  .btn:not(:disabled):active::after, .icon-btn:active::after { opacity: .12; }
+  @media (hover: hover) { .btn:not(:disabled):hover::after, .icon-btn:hover::after { opacity: .08; } }
+
+  .scrim { position: fixed; inset: 0; background: var(--md-scrim); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 2000; }
+  .scrim.open { display: flex; }
+  .dialog { width: 100%; max-width: 360px; background: var(--md-surface-container-high); border-radius: 28px; padding: 24px; }
+  .dialog h2 { font-size: 24px; font-weight: 400; margin: 0 0 16px; }
+  .dialog p, .dialog li { font-size: 14px; line-height: 20px; color: var(--md-on-surface-variant); }
+  .dialog ul { padding-left: 20px; margin: 0; }
+  .dialog .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin: 4px 0 4px; }
+  .grid3 .v { font-size: 22px; color: var(--md-on-surface); }
+  .grid3 .l { font-size: 12px; color: var(--md-on-surface-variant); }
+  .field { position: relative; margin: 8px 0 4px; }
+  .field label { position: absolute; left: 12px; top: -8px; padding: 0 4px; font-size: 12px; background: var(--md-surface-container-high); color: var(--md-on-surface-variant); }
+  .field input {
+    width: 100%; height: 56px; border: 1px solid var(--md-outline); border-radius: 4px; background: transparent;
+    color: var(--md-on-surface); font: 400 16px inherit; font-family: inherit; padding: 0 16px; outline: none; user-select: text;
+  }
+  .field input:focus { border: 2px solid var(--md-primary); padding-left: 15px; }
+  .field:focus-within label { color: var(--md-primary); }
+  .supporting { font-size: 12px; color: var(--md-on-surface-variant); margin: 4px 16px 0; }
+
+  .snackbar {
+    position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%);
+    background: var(--md-on-surface); color: var(--md-surface); white-space: nowrap; z-index: 3000;
+    padding: 14px 16px; border-radius: 4px; font-size: 14px; display: none;
+  }
+  .snackbar.show { display: block; }
+  /* ---------- Spider additions ---------- */
+  :root { --back: #6750A4; --back-line: rgba(255,255,255,.16); }
+  @media (prefers-color-scheme: dark) { :root { --back: #4F378B; --back-line: rgba(255,255,255,.12); } }
+  .card .idx { font-size: calc(var(--cw) * .36); }
+  .card .idx svg { width: calc(var(--cw) * .28); height: calc(var(--cw) * .28); }
+  .card.down {
+    background: var(--back);
+    background-image: repeating-linear-gradient(45deg, var(--back-line) 0 1px, transparent 1px calc(var(--cw) * .14)),
+                      repeating-linear-gradient(-45deg, var(--back-line) 0 1px, transparent 1px calc(var(--cw) * .14));
+    box-shadow: inset 0 0 0 calc(var(--cw) * .05) var(--back), inset 0 0 0 calc(var(--cw) * .07) rgba(255,255,255,.35), 0 0 0 1px var(--card-edge), 0 1px 2px rgba(0,0,0,.18);
+  }
+  .card.down > * { visibility: hidden; }
+  @keyframes flip { 0%, 100% { scale: 1 1; } 50% { scale: 0 1; } }
+  .card.flip { animation: flip .26s ease-in-out; }
+  .slot.stock { background: transparent; border: 1.5px dashed var(--md-outline-variant); }
+  .seg { display: flex; border: 1px solid var(--md-outline); border-radius: 20px; overflow: hidden; height: 40px; margin: 4px 0 14px; }
+  .seg button { flex: 1; border: none; border-left: 1px solid var(--md-outline); background: transparent; color: var(--md-on-surface);
+    font: 500 14px inherit; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; padding: 0 6px; }
+  .seg button:first-child { border-left: none; }
+  .seg button.on { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+  .seg button svg { width: 18px; height: 18px; fill: currentColor; }
+  .dialog .lbl { font-size: 14px; color: var(--md-on-surface-variant); margin: 0 0 6px; }
+  .dialog .credits { font-size: 12px; text-align: center; margin: 14px 0 0; }
+  .dialog .credits a { color: var(--md-primary); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="s0" viewBox="0 0 24 24"><circle cx="12" cy="7.2" r="4.3"/><circle cx="7.1" cy="13.6" r="4.3"/><circle cx="16.9" cy="13.6" r="4.3"/><path d="M10.9 12h2.2l1.6 9.5H9.3z"/></symbol>
+  <symbol id="s1" viewBox="0 0 24 24"><path d="M12 1.8 19.4 12 12 22.2 4.6 12z"/></symbol>
+  <symbol id="s2" viewBox="0 0 24 24"><path d="M12 21.3S3.2 15.6 3.2 9.2C3.2 5.9 5.7 3.5 8.6 3.5c1.6 0 2.7.7 3.4 1.8.7-1.1 1.8-1.8 3.4-1.8 2.9 0 5.4 2.4 5.4 5.7 0 6.4-8.8 12.1-8.8 12.1z"/></symbol>
+  <symbol id="s3" viewBox="0 0 24 24"><path d="M12 1.8c-2.7 4-8.6 7.2-8.6 11.6 0 2.6 2 4.6 4.6 4.6 1.4 0 2.6-.6 3.2-1.4-.3 1.9-1.1 3.4-2.7 4.6h7c-1.6-1.2-2.4-2.7-2.7-4.6.6.8 1.8 1.4 3.2 1.4 2.6 0 4.6-2 4.6-4.6 0-4.4-5.9-7.6-8.6-11.6z"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <h1>Spider</h1>
+    <button class="icon-btn" id="statsBtn" aria-label="Statistics">
+      <svg class="i" viewBox="0 0 24 24"><path d="M16 11V3H8v6H2v12h20V11h-6zm-6-6h4v14h-4V5zm-6 6h4v8H4v-8zm16 8h-4v-6h4v6z"/></svg>
+    </button>
+    <button class="icon-btn" id="helpBtn" aria-label="How to play">
+      <svg class="i" viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg>
+    </button>
+  </header>
+
+  <div class="status">
+    <div>
+      <div class="game-no" id="gameNo">Game #1</div>
+      <div class="game-sub" id="gameSub">1 suit</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="v" id="sMoves">0</div><div class="l">Moves</div></div>
+      <div class="stat"><div class="v" id="sTime">0:00</div><div class="l">Time</div></div>
+    </div>
+  </div>
+
+  <div class="table-wrap" id="wrap"><div class="table" id="table"></div></div>
+
+  <div class="actions">
+    <button class="btn tonal" id="undoBtn"><svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>Undo</button>
+    <button class="btn tonal" id="hintBtn"><svg viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>Hint</button>
+    <button class="btn tonal" id="restartBtn"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>Restart</button>
+    <button class="btn filled" id="newBtn"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>New game</button>
+  </div>
+</div>
+
+<!-- Win -->
+<div class="scrim" id="winScrim"><div class="dialog" role="dialog" aria-modal="true">
+  <h2>You won!</h2>
+  <div class="grid3">
+    <div><div class="v" id="wGame">#1</div><div class="l">Game</div></div>
+    <div><div class="v" id="wMoves">0</div><div class="l">Moves</div></div>
+    <div><div class="v" id="wTime">0:00</div><div class="l">Time</div></div>
+  </div>
+  <p id="wNote" style="text-align:center;margin:12px 0 0"></p>
+  <div class="row"><button class="btn text" data-close>Close</button><button class="btn filled" id="wNew">New game</button></div>
+</div></div>
+
+<!-- New game -->
+<div class="scrim" id="newScrim"><div class="dialog" role="dialog" aria-modal="true">
+  <h2>New game</h2>
+  <p class="lbl">Suits</p>
+  <div class="seg" id="newSeg"></div>
+  <div class="field"><label for="gameInput">Game number (optional)</label><input id="gameInput" type="text" inputmode="numeric" autocomplete="off" placeholder="1 – 1000000"></div>
+  <div class="supporting">The same number and suits always give the same deal.</div>
+  <div class="row">
+    <button class="btn text" data-close>Cancel</button>
+    <button class="btn text" id="playNumber">Play number</button>
+    <button class="btn filled" id="playRandom">Random deal</button>
+  </div>
+</div></div>
+
+<!-- Stats -->
+<div class="scrim" id="statsScrim"><div class="dialog" role="dialog" aria-modal="true">
+  <h2>Statistics</h2>
+  <div class="seg" id="statsSeg"></div>
+  <div class="grid3">
+    <div><div class="v" id="stPlayed">0</div><div class="l">Played</div></div>
+    <div><div class="v" id="stWon">0</div><div class="l">Won</div></div>
+    <div><div class="v" id="stPct">0%</div><div class="l">Win rate</div></div>
+  </div>
+  <div class="grid3" style="margin-top:16px">
+    <div><div class="v" id="stStreak">0</div><div class="l">Streak</div></div>
+    <div><div class="v" id="stBest">0</div><div class="l">Best streak</div></div>
+    <div><div class="v" id="stFast">–</div><div class="l">Fastest</div></div>
+  </div>
+  <div class="row"><button class="btn text" id="resetStats">Reset</button><button class="btn filled" data-close>Done</button></div>
+</div></div>
+
+<!-- Help -->
+<div class="scrim" id="helpScrim"><div class="dialog" role="dialog" aria-modal="true">
+  <h2>How to play</h2>
+  <ul>
+    <li>Build eight runs from King down to Ace, each in a single suit. A finished run leaves the table.</li>
+    <li>Place a card on any card one rank higher, whatever its suit.</li>
+    <li>Several cards can move together only if they run down in order and share a suit.</li>
+    <li>Any card or run can go into an empty column.</li>
+    <li>Tap the stock (top right) to deal one card onto every column. Each column needs at least one card first.</li>
+    <li><b>Tap</b> a card to move it to the best spot. <b>Drag</b> to choose where it goes.</li>
+    <li>Pick 1, 2 or 4 suits under <b>New game</b>. 1 suit is the easiest.</li>
+  </ul>
+  <p class="credits">Spider 1.0 · by Meyzenworks · <a href="privacy.html">Privacy</a></p>
+  <div class="row"><button class="btn filled" data-close>Play</button></div>
+</div></div>
+
+<div class="snackbar" id="snackbar"></div>
+
+<script>
+(() => {
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+  };
+
+  // ---------- Cards: 104 cards, id 0..103; rank = id % 13 + 1; suit depends on the difficulty ----------
+  const SUITSETS = { 1: [3], 2: [3, 2], 4: [0, 1, 2, 3] };          // ♣ ♦ ♥ ♠
+  const RANK_TXT = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const SUIT_NAME = ['clubs', 'diamonds', 'hearts', 'spades'];
+  const N = 104, COLS = 10;
+  const rankOf = id => id % 13 + 1;
+  const suitOf = id => SUITSETS[S.n][Math.floor(id / 13) % S.n];
+  const isRed = id => { const s = suitOf(id); return s === 1 || s === 2; };
+
+  function shuffled(game, n) {
+    let a = (game * 2654435761 + n * 97 + 12345) >>> 0;
+    const rnd = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const d = Array.from({ length: N }, (_, i) => i);
+    for (let i = N - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+    return d;
+  }
+  function freshState(game, n) {
+    const d = shuffled(game, n);
+    const cols = Array.from({ length: COLS }, () => []);
+    for (let i = 0; i < 54; i++) cols[i % COLS].push(d[i]);
+    return { game, n, cols, up: cols.map(c => c.length - 1), stock: d.slice(54), found: [], moves: 0, elapsed: 0, started: false, won: false };
+  }
+
+  // ---------- State ----------
+  let S;            // { game, n, cols, up, stock, found: [[ids K..A]], moves, elapsed, started, won }
+  let history = [];
+  let autoOrder = [];            // cards sent to the finished piles after the last move, in order
+  let autoFlip = [];             // cards turned face up once a finished run has left
+  const snapshot = () => JSON.stringify({ cols: S.cols, up: S.up, stock: S.stock, found: S.found, moves: S.moves });
+  const clone = () => ({ ...S, cols: S.cols.map(c => c.slice()), up: S.up.slice(), stock: S.stock.slice(), found: S.found.map(f => f.slice()) });
+  function save() { store.set('sp.state', { S, history: history.slice(-300) }); }
+
+  let painted = 0;
+  function newGame(game, n = S ? S.n : 1) {
+    if (S && S.started && !S.won) recordLoss();
+    S = freshState(game, n);
+    history = []; autoOrder = []; autoFlip = [];
+    store.set('sp.suits', n);
+    paintCards(); save(); dealAnimation(); updateStatus();
+  }
+  // Opening deal: cards fly out from the stock, row by row; the top cards turn over as they land.
+  function dealAnimation() {
+    if (!L.cw) computeLayout();
+    table.classList.add('no-anim');
+    const sx = stockX(), sy = L.y0;
+    cardEl.forEach(el => { el.style.left = sx + 'px'; el.style.top = sy + 'px'; el._x = sx; el._y = sy; el.style.zIndex = 1; el.style.display = ''; setFace(el, false, 0, true); });
+    void table.offsetWidth;
+    table.classList.remove('no-anim');
+    const delays = new Map();
+    S.cols.forEach((col, c) => col.forEach((id, k) => delays.set(id, (k * COLS + c) * 11)));
+    render({ delays });
+  }
+
+  // ---------- Rules ----------
+  const follows = (a, b) => rankOf(a) === rankOf(b) - 1;                  // a can sit on b
+  const chained = (a, b) => follows(a, b) && suitOf(a) === suitOf(b);       // a, b move together
+  function runFrom(c, i) {
+    const col = S.cols[c];
+    if (i < S.up[c] || i >= col.length) return null;
+    for (let k = i; k < col.length - 1; k++) if (!chained(col[k + 1], col[k])) return null;
+    return col.slice(i);
+  }
+  // src: {c, i}   dst: {c}
+  function legal(src, dst) {
+    if (src.c === dst.c) return false;
+    const cards = runFrom(src.c, src.i); if (!cards) return false;
+    const col = S.cols[dst.c];
+    return !col.length || follows(cards[0], col[col.length - 1]);
+  }
+  function turnOver(c) {
+    const col = S.cols[c];
+    if (col.length && S.up[c] >= col.length) { S.up[c] = col.length - 1; return col[col.length - 1]; }
+    if (!col.length) S.up[c] = 0;
+    return -1;
+  }
+  function apply(src, dst) {
+    const cards = S.cols[src.c].splice(src.i);
+    S.cols[dst.c].push(...cards);
+    if (S.cols[dst.c].length === cards.length) S.up[dst.c] = 0;
+    turnOver(src.c);
+  }
+  // A full King-to-Ace run of one suit at the end of a column leaves the table.
+  function collectRuns() {
+    for (let c = 0; c < COLS; c++) {
+      const col = S.cols[c], n = col.length;
+      if (n < 13 || n - 13 < S.up[c]) continue;
+      const run = col.slice(n - 13);
+      if (rankOf(run[0]) !== 13) continue;
+      let ok = true;
+      for (let k = 0; k < 12; k++) if (!chained(run[k + 1], run[k])) { ok = false; break; }
+      if (!ok) continue;
+      col.length = n - 13;
+      S.found.push(run);
+      for (let k = 12; k >= 0; k--) autoOrder.push(run[k]);           // Ace first, King last
+      const t = turnOver(c); if (t >= 0) autoFlip.push(t);
+      c = -1;                                                          // look again from the start
+    }
+  }
+  function finishMove(mid) {
+    collectRuns();
+    if (S.found.length === 8) {
+      S.won = true; recordWin(); save(); const t = showMove(mid); updateStatus();
+      setTimeout(showWin, Math.max(t, MOVE_MS) + 300); return;
+    }
+    save(); showMove(mid); updateStatus();
+    if (!S.stock.length && !allMoves().length) snack('No moves left — try Undo or a new game');
+  }
+  function begin() {
+    history.push(snapshot()); autoOrder = []; autoFlip = [];
+    S.moves++;
+    if (!S.started) { S.started = true; countPlayed(); }
+  }
+  function move(src, dst) {
+    if (S.won || !legal(src, dst)) return false;
+    begin(); apply(src, dst);
+    finishMove(clone());
+    return true;
+  }
+  function dealStock() {
+    if (S.won || !S.stock.length) return;
+    if (S.cols.some(c => !c.length)) { snack('Put a card in every empty column before dealing'); return; }
+    clearHint();
+    begin();
+    const cards = S.stock.splice(-COLS);
+    cards.forEach((id, c) => { S.cols[c].push(id); });
+    dealt = new Map(cards.map((id, c) => [id, c * 45]));
+    finishMove(clone());
+  }
+  let dealt = null;   // stagger for cards coming off the stock
+
+  // Your move shows first; once it has landed, finished runs glide away card by card.
+  const MOVE_MS = 220, AUTO_MS = 380, STEP = 38;
+  var autoTimer = null, autoToken = 0;
+  function showMove(mid) {
+    clearTimeout(autoTimer); autoTimer = null;
+    const dd = dealt; dealt = null;
+    if (!autoOrder.length) { render({ delays: dd }); return dd ? 450 + MOVE_MS : 0; }
+    const real = S; S = mid; render({ delays: dd }); S = real;
+    const delays = new Map(autoOrder.map((id, k) => [id, k * STEP]));
+    const flipAt = (autoOrder.length - 1) * STEP + AUTO_MS * .6;
+    const go = () => { if (token !== autoToken) return; clearTimeout(autoTimer); autoTimer = null; render({ delays, auto: new Set(autoOrder), flipAt }); };
+    const token = ++autoToken;
+    void table.offsetWidth;
+    const anims = movedEls.flatMap(el => el.getAnimations ? el.getAnimations().filter(a => a.transitionProperty) : []);
+    autoTimer = setTimeout(go, dd ? 1400 : 900);   // safety net
+    if (anims.length) Promise.all(anims.map(an => an.finished.catch(() => {}))).then(() => setTimeout(go, 60));
+    else autoTimer = setTimeout(go, MOVE_MS + 60);
+    return (dd ? 450 : 0) + MOVE_MS + 60 + flipAt + AUTO_MS;
+  }
+
+  // ---------- Moves list (for tap, hint and "no moves") ----------
+  function allMoves() {
+    const out = [];
+    for (let c = 0; c < COLS; c++) {
+      const col = S.cols[c];
+      for (let i = col.length - 1; i >= S.up[c]; i--) {
+        if (!runFrom(c, i)) break;
+        for (let d = 0; d < COLS; d++) if (legal({ c, i }, { c: d })) out.push({ src: { c, i }, dst: { c: d } });
+      }
+    }
+    return out;
+  }
+  // How useful a move is; -1 = pointless.
+  function scoreMove({ src, dst }) {
+    const col = S.cols[src.c], first = col[src.i], dcol = S.cols[dst.c];
+    const below = src.i > 0 ? col[src.i - 1] : -1, belowUp = src.i - 1 >= S.up[src.c];
+    const seated = below >= 0 && belowUp && follows(first, below);          // already on a fitting card
+    const reveals = src.i > 0 && src.i === S.up[src.c];
+    const empties = src.i === 0;
+    if (!dcol.length) {
+      if (empties || seated) return -1;
+      return 4 + (reveals ? 22 : 0) + (col.length - src.i);
+    }
+    const same = suitOf(dcol[dcol.length - 1]) === suitOf(first);
+    if (seated && (!same || suitOf(below) === suitOf(first))) return -1;
+    return 10 + (same ? 40 : 0) + (reveals ? 30 : 0) + (empties ? 25 : 0) + (col.length - src.i) * .5;
+  }
+
+  // Tap: same suit first, then any fitting card, then an empty column.
+  function nudge(ids) {
+    ids.forEach(id => { const el = cardEl[id]; el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge'); setTimeout(() => el.classList.remove('nudge'), 220); });
+  }
+  function tapMove(src) {
+    const cards = runFrom(src.c, src.i);
+    if (!cards) { nudge([S.cols[src.c][src.i]]); snack('Only cards in order and of one suit move together'); return; }
+    const first = cards[0];
+    const cands = [];
+    for (let d = 0; d < COLS; d++) {
+      if (!legal(src, { c: d })) continue;
+      const dcol = S.cols[d];
+      let rank;
+      if (!dcol.length) rank = src.i === 0 ? -1 : 1;
+      else rank = suitOf(dcol[dcol.length - 1]) === suitOf(first) ? 3 : 2;
+      if (rank > 0) cands.push({ d, rank, s: scoreMove({ src, dst: { c: d } }) });
+    }
+    cands.sort((a, b) => b.rank - a.rank || b.s - a.s);
+    if (cands.length && move(src, { c: cands[0].d })) return;
+    nudge(cards);
+    snack(cards.length > 1 ? 'No place for these cards' : 'No place for this card');
+  }
+
+  // ---------- Rendering ----------
+  const table = document.getElementById('table'), wrap = document.getElementById('wrap');
+  const cardEl = [];
+  const slotEl = { found: [], col: [], stock: null };
+  let L = {};
+
+  function buildDom() {
+    for (let i = 0; i < 8; i++) { const s = document.createElement('div'); s.className = 'slot'; table.appendChild(s); slotEl.found.push(s); }
+    for (let i = 0; i < COLS; i++) { const s = document.createElement('div'); s.className = 'slot col'; table.appendChild(s); slotEl.col.push(s); }
+    slotEl.stock = document.createElement('div'); slotEl.stock.className = 'slot stock'; table.appendChild(slotEl.stock);
+    for (let id = 0; id < N; id++) { const el = document.createElement('div'); el.dataset.id = id; table.appendChild(el); cardEl.push(el); }
+  }
+  // Card faces depend on how many suits are in play.
+  function paintCards() {
+    if (painted === S.n) return;
+    painted = S.n;
+    cardEl.forEach((el, id) => {
+      const r = rankOf(id), s = suitOf(id);
+      el.className = 'card ' + (isRed(id) ? 'red' : 'black') + (el.classList.contains('down') ? ' down' : '');
+      el.setAttribute('aria-label', `${RANK_TXT[r]} of ${SUIT_NAME[s]}`);
+      const pip = r > 10 ? `<span class="face">${RANK_TXT[r]}</span>` : `<svg><use href="#s${s}"/></svg>`;
+      el.innerHTML = `<div class="idx"><span>${RANK_TXT[r]}</span><svg><use href="#s${s}"/></svg></div><div class="pip">${pip}</div>`;
+    });
+  }
+
+  function computeLayout() {
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    let gap = Math.max(3, Math.min(12, W * 0.011));
+    let cw = (W - gap * (COLS + 1)) / COLS;
+    cw = Math.min(cw, H / (1.4 * 3.3), 100);
+    gap = Math.max(3, Math.min(14, cw * 0.12));
+    const ch = cw * 1.4;
+    const total = cw * COLS + gap * (COLS - 1);
+    const x0 = (W - total) / 2, y0 = Math.max(gap, 8);
+    L = { W, H, gap, cw, ch, x0, y0, tabTop: y0 + ch + gap * 1.6 };
+    table.style.setProperty('--cw', cw + 'px');
+    table.style.setProperty('--ch', ch + 'px');
+  }
+  const colX = c => L.x0 + c * (L.cw + L.gap);
+  const stockX = () => colX(COLS - 1);
+  // Face-down cards sit close together; face-up cards show their corner.
+  function fan(c) {
+    const col = S.cols[c], nd = Math.min(S.up[c], col.length), nu = col.length - nd;
+    let dOff = Math.max(3, L.ch * 0.1), uOff = L.ch * 0.29;
+    const need = nd * dOff + Math.max(0, nu - 1) * uOff, avail = L.H - L.tabTop - L.ch - 6;
+    if (need > avail && need > 0) { const f = avail / need; dOff = Math.max(2, dOff * f); uOff = Math.max(8, uOff * f); }
+    const ys = []; let y = L.tabTop;
+    for (let k = 0; k < col.length; k++) { ys.push(y); y += k < nd ? dOff : uOff; }
+    return ys;
+  }
+
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function setFace(el, up, delay, instant) {
+    const inst = instant || renderOpts.instant || reduced();
+    const apply = () => el.classList.toggle('down', !up);
+    if (el._up === up) { if (inst) { clearTimeout(el._ft); el.classList.remove('flip'); apply(); } return; }
+    clearTimeout(el._ft);
+    el._up = up;
+    if (inst) { el.classList.remove('flip'); apply(); return; }
+    const start = () => { el.classList.remove('flip'); void el.offsetWidth; el.classList.add('flip'); el._ft = setTimeout(() => { apply(); el._ft = setTimeout(() => el.classList.remove('flip'), 140); }, 130); };
+    if (delay) el._ft = setTimeout(start, delay); else start();
+  }
+
+  let renderOpts = {}, lift = 0, movedEls = [];
+  function place(el, x, y, z, up) {
+    const id = +el.dataset.id;
+    const moved = Math.abs((el._x ?? -1) - x) > .5 || Math.abs((el._y ?? -1) - y) > .5 || el.classList.contains('dragging');
+    el.style.display = '';
+    el.style.left = x + 'px'; el.style.top = y + 'px'; el._x = x; el._y = y;
+    clearTimeout(el._zt); clearTimeout(el._zr);
+    const d = (renderOpts.delays && renderOpts.delays.get(id)) || 0;
+    if (moved && !renderOpts.instant) {
+      movedEls.push(el);
+      const top = 400 + (lift++);
+      const auto = !!renderOpts.auto && renderOpts.auto.has(id);
+      const dur = auto ? AUTO_MS : MOVE_MS;
+      el.style.transitionDuration = auto ? AUTO_MS + 'ms' : '';
+      el.style.transitionTimingFunction = auto ? 'cubic-bezier(.3,0,.2,1)' : '';
+      el.style.transitionDelay = d + 'ms';
+      if (d) el._zr = setTimeout(() => { el.style.zIndex = top; }, d); else el.style.zIndex = top;
+      el._zt = setTimeout(() => { el.style.zIndex = z; el.style.transitionDelay = '0ms'; el.style.transitionDuration = ''; el.style.transitionTimingFunction = ''; }, d + dur + 40);
+    } else { el.style.zIndex = z; el.style.transitionDelay = '0ms'; el.style.transitionDuration = ''; el.style.transitionTimingFunction = ''; }
+    setFace(el, up, moved ? d : (renderOpts.flipAt || 0));
+  }
+
+  function render(opts = {}) {
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; } autoToken++;
+    movedEls = [];
+    renderOpts = opts; lift = 0;
+    if (!L.cw) computeLayout();
+    if (opts.instant) table.classList.add('no-anim');
+    const seen = new Array(N).fill(false);
+    const box = (el, x, y) => Object.assign(el.style, { left: x + 'px', top: y + 'px', width: L.cw + 'px', height: L.ch + 'px' });
+    for (let i = 0; i < 8; i++) box(slotEl.found[i], colX(i), L.y0);
+    box(slotEl.stock, stockX(), L.y0);
+    S.cols.forEach((col, c) => {
+      box(slotEl.col[c], colX(c), L.tabTop);
+      const ys = fan(c);
+      col.forEach((id, k) => { place(cardEl[id], colX(c), ys[k], 10 + k, k >= S.up[c]); seen[id] = true; });
+    });
+    // stock: one small pile per remaining deal, fanning left from the top-right corner
+    const groups = S.stock.length / COLS, off = Math.min(L.cw * 0.22, (L.cw + L.gap) / 4);
+    S.stock.forEach((id, k) => {
+      const g = Math.floor(k / COLS);
+      place(cardEl[id], stockX() - (groups - 1 - g) * off, L.y0, 50 + k, false); seen[id] = true;
+    });
+    // finished runs, King on top
+    S.found.forEach((run, f) => run.forEach((id, k) => { place(cardEl[id], colX(f), L.y0, 30 - k, true); seen[id] = true; }));
+    cardEl.forEach((el, id) => { if (!seen[id]) el.style.display = 'none'; el.style.transform = ''; el.classList.remove('dragging'); });
+    if (opts.instant) { void table.offsetWidth; table.classList.remove('no-anim'); }
+  }
+  new ResizeObserver(() => { if (wrap.clientWidth === L.W && wrap.clientHeight === L.H) return; computeLayout(); if (S) render({ instant: true }); }).observe(wrap);
+
+  // ---------- Input: tap or drag ----------
+  function locate(id) {
+    for (let c = 0; c < COLS; c++) { const i = S.cols[c].indexOf(id); if (i >= 0) return { t: 'col', c, i }; }
+    if (S.stock.includes(id)) return { t: 'stock' };
+    return { t: 'found' };
+  }
+  function targetAt(x, y) {
+    const r = table.getBoundingClientRect(); x -= r.left; y -= r.top;
+    const c = Math.floor((x - L.x0 + L.gap / 2) / (L.cw + L.gap));
+    if (c < 0 || c >= COLS || y < L.tabTop - L.gap) return null;
+    return { c };
+  }
+
+  let drag = null;
+  table.addEventListener('pointerdown', e => {
+    if (!S || S.won) return;
+    if (e.target === slotEl.stock) return;
+    const el = e.target.closest('.card'); if (!el) return;
+    const id = +el.dataset.id, loc = locate(id);
+    if (loc.t === 'stock') { dealStock(); return; }
+    if (loc.t !== 'col') return;
+    clearHint();
+    drag = { src: { c: loc.c, i: loc.i }, x: e.clientX, y: e.clientY, moved: false, pid: e.pointerId, els: [] };
+    table.setPointerCapture(e.pointerId);
+  });
+  table.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < 7) return;
+      const cards = runFrom(drag.src.c, drag.src.i);
+      if (!cards) { if (drag.src.i >= S.up[drag.src.c]) snack('Only cards in order and of one suit move together'); drag = null; return; }
+      drag.moved = true;
+      drag.els = cards.map(id => cardEl[id]);
+      drag.els.forEach((el, k) => { el.classList.add('dragging'); el.style.zIndex = 1000 + k; });
+    }
+    drag.els.forEach(el => { el.style.transform = `translate(${dx}px, ${dy}px)`; });
+  });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.pid) return;
+    const d = drag; drag = null;
+    if (!d.moved) { if (d.src.i >= S.up[d.src.c]) tapMove(d.src); return; }
+    const dst = targetAt(e.clientX, e.clientY);
+    if (!dst || !move(d.src, dst)) render();
+  }
+  table.addEventListener('pointerup', endDrag);
+  table.addEventListener('pointercancel', () => { if (drag) { drag = null; render(); } });
+
+  // ---------- Hint ----------
+  let hintTimer = null;
+  function clearHint() { document.querySelectorAll('.hint').forEach(n => n.classList.remove('hint')); clearTimeout(hintTimer); }
+  function showHint() {
+    if (S.won) return;
+    clearHint();
+    const prev = history.length ? JSON.parse(history[history.length - 1]) : null;
+    const key = () => JSON.stringify({ cols: S.cols, up: S.up });
+    const reverses = m => {
+      if (!prev) return false;
+      const keep = clone();
+      apply(m.src, m.dst);
+      const same = key() === JSON.stringify({ cols: prev.cols, up: prev.up });
+      S = Object.assign(S, keep);
+      return same;
+    };
+    const moves = allMoves().map(m => ({ m, s: scoreMove(m) })).filter(x => x.s >= 0 && !reverses(x.m)).sort((a, b) => b.s - a.s);
+    if (!moves.length) {
+      if (S.stock.length) {
+        if (S.cols.some(c => !c.length)) { snack('Move any card into the empty column, then deal'); return; }
+        const top = S.stock[S.stock.length - 1]; cardEl[top].classList.add('hint');
+        snack('Deal more cards from the stock');
+        hintTimer = setTimeout(clearHint, 2200); return;
+      }
+      snack('No moves left — try Undo or a new game'); return;
+    }
+    const { src, dst } = moves[0].m;
+    runFrom(src.c, src.i).forEach(id => cardEl[id].classList.add('hint'));
+    const col = S.cols[dst.c];
+    (col.length ? cardEl[col[col.length - 1]] : slotEl.col[dst.c]).classList.add('hint');
+    hintTimer = setTimeout(clearHint, 2200);
+  }
+
+  // ---------- Stats (kept separately for 1, 2 and 4 suits) ----------
+  const defStats = { played: 0, won: 0, streak: 0, best: 0, fastest: 0 };
+  let allStats = store.get('sp.stats', {});
+  const statsFor = n => (allStats[n] = Object.assign({}, defStats, allStats[n] || {}));
+  const saveStats = () => store.set('sp.stats', allStats);
+  function countPlayed() { statsFor(S.n).played++; saveStats(); }
+  function recordWin() {
+    const st = statsFor(S.n);
+    st.won++; st.streak++; st.best = Math.max(st.best, st.streak);
+    if (!st.fastest || S.elapsed < st.fastest) st.fastest = S.elapsed;
+    saveStats();
+  }
+  function recordLoss() { statsFor(S.n).streak = 0; saveStats(); }
+
+  // ---------- UI ----------
+  const suitsTxt = n => n === 1 ? '1 suit' : `${n} suits`;
+  function fmtTime(s) { const m = Math.floor(s / 60), r = s % 60; return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}:${String(r).padStart(2, '0')}` : `${m}:${String(r).padStart(2, '0')}`; }
+  function updateStatus() {
+    const deals = S.stock.length / COLS;
+    document.getElementById('gameNo').textContent = `Game #${S.game}`;
+    document.getElementById('gameSub').textContent = S.won ? `${suitsTxt(S.n)} · Solved`
+      : `${suitsTxt(S.n)} · ${S.found.length} of 8 runs · ${deals ? deals + (deals === 1 ? ' deal' : ' deals') + ' left' : 'no deals left'}`;
+    document.getElementById('sMoves').textContent = S.moves;
+    document.getElementById('sTime').textContent = fmtTime(S.elapsed);
+    document.getElementById('undoBtn').disabled = S.won || !history.length;
+    document.getElementById('hintBtn').disabled = S.won;
+    document.getElementById('restartBtn').disabled = !S.moves;
+  }
+  setInterval(() => {
+    if (!S || !S.started || S.won || document.visibilityState !== 'visible') return;
+    S.elapsed++; document.getElementById('sTime').textContent = fmtTime(S.elapsed);
+    if (S.elapsed % 5 === 0) save();
+  }, 1000);
+
+  const open = id => document.getElementById(id).classList.add('open');
+  const closeAll = () => document.querySelectorAll('.scrim.open').forEach(s => s.classList.remove('open'));
+  document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeAll));
+  document.querySelectorAll('.scrim').forEach(s => s.addEventListener('click', e => { if (e.target === s) closeAll(); }));
+
+  // segmented buttons: 1 suit / 2 suits / 4 suits
+  const CHECK = '<svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+  function seg(elId, value, onPick) {
+    const el = document.getElementById(elId);
+    el.innerHTML = '';
+    [1, 2, 4].forEach(n => {
+      const b = document.createElement('button');
+      b.className = n === value ? 'on' : '';
+      b.innerHTML = (n === value ? CHECK : '') + suitsTxt(n);
+      b.addEventListener('click', () => onPick(n));
+      el.appendChild(b);
+    });
+  }
+  let pickN = 1;
+  function openNew() {
+    pickN = S.n;
+    const draw = () => seg('newSeg', pickN, n => { pickN = n; draw(); });
+    draw();
+    document.getElementById('gameInput').value = '';
+    open('newScrim');
+  }
+
+  document.getElementById('undoBtn').addEventListener('click', () => {
+    if (!history.length || S.won) return;
+    clearHint();
+    Object.assign(S, JSON.parse(history.pop()));
+    save(); render(); updateStatus();
+  });
+  document.getElementById('restartBtn').addEventListener('click', () => {
+    if (!S.moves) return;
+    clearHint();
+    if (!S.won) recordLoss();
+    S = freshState(S.game, S.n);
+    history = []; autoOrder = []; autoFlip = []; save(); dealAnimation(); updateStatus();
+  });
+  document.getElementById('hintBtn').addEventListener('click', showHint);
+  const randomGame = () => 1 + Math.floor(Math.random() * 1000000);
+  document.getElementById('newBtn').addEventListener('click', openNew);
+  document.getElementById('playRandom').addEventListener('click', () => { closeAll(); newGame(randomGame(), pickN); });
+  document.getElementById('playNumber').addEventListener('click', () => {
+    const n = parseInt(document.getElementById('gameInput').value, 10);
+    if (!(n >= 1 && n <= 1000000)) { snack('Enter a number from 1 to 1,000,000'); return; }
+    closeAll(); newGame(n, pickN);
+  });
+  document.getElementById('gameInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('playNumber').click(); });
+
+  function showWin() {
+    document.getElementById('wGame').textContent = '#' + S.game;
+    document.getElementById('wMoves').textContent = S.moves;
+    document.getElementById('wTime').textContent = fmtTime(S.elapsed);
+    const st = statsFor(S.n);
+    document.getElementById('wNote').textContent = `${suitsTxt(S.n)}` + (st.streak > 1 ? ` · ${st.streak} wins in a row` : '');
+    open('winScrim');
+  }
+  document.getElementById('wNew').addEventListener('click', () => { closeAll(); openNew(); });
+
+  let statsN = 1;
+  function showStats(n = S.n) {
+    statsN = n;
+    seg('statsSeg', n, showStats);
+    const st = statsFor(n);
+    document.getElementById('stPlayed').textContent = st.played;
+    document.getElementById('stWon').textContent = st.won;
+    document.getElementById('stPct').textContent = st.played ? Math.round(st.won / st.played * 100) + '%' : '0%';
+    document.getElementById('stStreak').textContent = st.streak;
+    document.getElementById('stBest').textContent = st.best;
+    document.getElementById('stFast').textContent = st.fastest ? fmtTime(st.fastest) : '–';
+    open('statsScrim');
+  }
+  document.getElementById('statsBtn').addEventListener('click', () => showStats());
+  document.getElementById('resetStats').addEventListener('click', () => { allStats[statsN] = Object.assign({}, defStats); saveStats(); showStats(statsN); });
+  document.getElementById('helpBtn').addEventListener('click', () => open('helpScrim'));
+
+  const snackEl = document.getElementById('snackbar'); let snackT;
+  function snack(m) { snackEl.textContent = m; snackEl.classList.add('show'); clearTimeout(snackT); snackT = setTimeout(() => snackEl.classList.remove('show'), 2200); }
+
+  document.addEventListener('keydown', e => {
+    if (document.querySelector('.scrim.open')) { if (e.key === 'Escape') closeAll(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); document.getElementById('undoBtn').click(); }
+    if (e.key === ' ' || e.key.toLowerCase() === 'd') { e.preventDefault(); dealStock(); }
+  });
+
+  // ---------- Start ----------
+  if (!store.get('sp.firstOpened', null)) store.set('sp.firstOpened', { date: new Date().toISOString(), version: '1.0.0' });
+  buildDom();
+  computeLayout();
+  const saved = store.get('sp.state', null);
+  if (saved && saved.S && Array.isArray(saved.S.cols) && saved.S.n) { S = saved.S; history = saved.history || []; paintCards(); render({ instant: true }); updateStatus(); }
+  else { S = null; newGame(randomGame(), store.get('sp.suits', 1)); }
+  if (!store.get('sp.seenHelp', false)) { open('helpScrim'); store.set('sp.seenHelp', true); }
+
+  window.__sp = { get S() { return S; }, set S(v) { S = v; }, move, tapMove, allMoves, newGame, render, dealStock, legal, runFrom, scoreMove, freshState, paintCards, collectRuns };
+})();
+</script>
+<script>
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+</script>
+</body>
+</html>
