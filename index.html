@@ -155,6 +155,7 @@
     box-shadow: inset 0 0 0 calc(var(--cw) * .05) var(--back), inset 0 0 0 calc(var(--cw) * .07) rgba(255,255,255,.35), 0 0 0 1px var(--card-edge), 0 1px 2px rgba(0,0,0,.18);
   }
   .card.down > * { visibility: hidden; }
+  .fancy-back .card.down, .back-opt .sw.fancy { box-shadow: 0 0 0 1px var(--card-edge), 0 1px 2px rgba(0,0,0,.18); }
   @keyframes flip { 0%, 100% { scale: 1 1; } 50% { scale: 0 1; } }
   .card.flip { animation: flip .26s ease-in-out; }
   .slot.stock { background: transparent; border: 1.5px dashed var(--md-outline-variant); }
@@ -492,6 +493,14 @@
   function nudge(ids) {
     ids.forEach(id => { const el = cardEl[id]; el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge'); setTimeout(() => el.classList.remove('nudge'), 220); });
   }
+  // Length of the descending run at the bottom of column d once `cards` are added
+  // (sameSuit: count only cards that also share a suit).
+  function runAfter(d, cards, sameSuit) {
+    const col = S.cols[d].concat(cards), ok = sameSuit ? chained : follows;
+    let n = 1;
+    for (let k = col.length - 1; k > 0 && k - 1 >= S.up[d]; k--) { if (!ok(col[k], col[k - 1])) break; n++; }
+    return n;
+  }
   function tapMove(src) {
     const cards = runFrom(src.c, src.i);
     if (!cards) { nudge([S.cols[src.c][src.i]]); snack('Only cards in order and of one suit move together'); return; }
@@ -503,9 +512,10 @@
       let rank;
       if (!dcol.length) rank = src.i === 0 ? -1 : 1;
       else rank = suitOf(dcol[dcol.length - 1]) === suitOf(first) ? 3 : 2;
-      if (rank > 0) cands.push({ d, rank, n: dcol.length });
+      if (rank > 0) cands.push({ d, rank, seq: runAfter(d, cards, false), suit: runAfter(d, cards, true) });
     }
-    cands.sort((a, b) => b.rank - a.rank || b.n - a.n);   // same suit first, then the column holding the most cards
+    // longest run in order after the move; then longest run in one suit; empty columns last
+    cands.sort((a, b) => (b.rank > 1) - (a.rank > 1) || b.seq - a.seq || b.suit - a.suit || b.rank - a.rank);
     if (cands.length && move(src, { c: cands[0].d })) return;
     nudge(cards);
     snack(cards.length > 1 ? 'No place for these cards' : 'No place for this card');
@@ -720,27 +730,66 @@
   function recordLoss() { statsFor(S.n).streak = 0; saveStats(); }
 
   // ---------- Settings ----------
+  const svgUrl = svg => `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140" preserveAspectRatio="none">' + svg + '</svg>')}")`;
+  const petals = (cx, cy, n, rx, ry, d, fill) => Array.from({ length: n }, (_, k) =>
+    `<ellipse cx="${cx}" cy="${cy - d}" rx="${rx}" ry="${ry}" fill="${fill}" transform="rotate(${k * 360 / n} ${cx} ${cy})"/>`).join('');
+  const CLASSIC_RED = svgUrl(`
+    <defs><pattern id="p" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <path d="M0 0H7M0 0V7" stroke="#fff" stroke-opacity=".38" stroke-width=".55"/><circle cx="3.5" cy="3.5" r="1" fill="#fff" fill-opacity=".5"/></pattern></defs>
+    <rect width="100" height="140" fill="#fff"/>
+    <rect x="5" y="5" width="90" height="130" rx="3" fill="#A3262E"/>
+    <rect x="8" y="8" width="84" height="124" rx="2" fill="url(#p)" stroke="#fff" stroke-width=".9"/>
+    <rect x="11" y="11" width="78" height="118" rx="1.5" fill="none" stroke="#fff" stroke-opacity=".65" stroke-width=".45"/>
+    ${[[14,14],[86,14],[14,126],[86,126]].map(([x,y]) => `<path d="M${x} ${y-4}L${x+4} ${y}L${x} ${y+4}L${x-4} ${y}Z" fill="#fff"/><circle cx="${x}" cy="${y}" r="1.2" fill="#A3262E"/>`).join('')}
+    <ellipse cx="50" cy="70" rx="22" ry="29" fill="#A3262E" stroke="#fff" stroke-width="1.2"/>
+    <ellipse cx="50" cy="70" rx="18.5" ry="25.5" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width=".5"/>
+    ${petals(50, 70, 8, 3.2, 8.5, 9, '#fff')}${petals(50, 70, 8, 1.4, 4, 15, '#fff')}
+    <circle cx="50" cy="70" r="4" fill="#A3262E" stroke="#fff" stroke-width="1"/><circle cx="50" cy="70" r="1.4" fill="#fff"/>`);
+  const ROYAL = svgUrl(`
+    <defs><pattern id="q" width="12" height="12" patternUnits="userSpaceOnUse">
+      <g fill="none" stroke="#D9B65F" stroke-opacity=".5" stroke-width=".5"><circle cx="6" cy="3" r="3"/><circle cx="6" cy="9" r="3"/><circle cx="3" cy="6" r="3"/><circle cx="9" cy="6" r="3"/></g>
+      <circle cx="6" cy="6" r=".8" fill="#D9B65F" fill-opacity=".7"/><circle cx="0" cy="0" r=".8" fill="#D9B65F" fill-opacity=".7"/></pattern></defs>
+    <rect width="100" height="140" fill="#1C2650"/>
+    <rect x="4" y="4" width="92" height="132" rx="3" fill="none" stroke="#D9B65F" stroke-width="1.3"/>
+    <rect x="7.5" y="7.5" width="85" height="125" rx="2" fill="url(#q)" stroke="#D9B65F" stroke-width=".5"/>
+    <path d="M50 38L78 70L50 102L22 70Z" fill="#1C2650" stroke="#D9B65F" stroke-width="1.2"/>
+    <path d="M50 44L72.5 70L50 96L27.5 70Z" fill="none" stroke="#D9B65F" stroke-width=".5"/>
+    <g fill="#D9B65F"><rect x="41" y="61" width="18" height="18"/><rect x="41" y="61" width="18" height="18" transform="rotate(45 50 70)"/></g>
+    <circle cx="50" cy="70" r="5" fill="#1C2650" stroke="#D9B65F" stroke-width=".8"/>${petals(50, 70, 6, 1, 2.5, 2.6, '#D9B65F')}`);
+  const rays = Array.from({ length: 36 }, (_, k) => { const a = k * Math.PI / 18; return `<line x1="50" y1="70" x2="${(50 + 90 * Math.cos(a)).toFixed(1)}" y2="${(70 + 90 * Math.sin(a)).toFixed(1)}"/>`; }).join('');
+  const decoFan = (x, y, rot) => `<g transform="translate(${x} ${y}) rotate(${rot})" fill="none" stroke="#D4AF5A" stroke-width=".6"><path d="M0 14A14 14 0 0 1 14 0"/><path d="M0 10A10 10 0 0 1 10 0"/><path d="M0 6A6 6 0 0 1 6 0"/><path d="M0 0L9.9 9.9"/></g>`;
+  const DECO = svgUrl(`
+    <defs><clipPath id="c"><rect x="8" y="8" width="84" height="124"/></clipPath></defs>
+    <rect width="100" height="140" fill="#15161C"/>
+    <g clip-path="url(#c)" stroke="#D4AF5A" stroke-opacity=".28" stroke-width=".55">${rays}</g>
+    <rect x="4" y="4" width="92" height="132" fill="none" stroke="#D4AF5A" stroke-width="1.2"/>
+    <rect x="8" y="8" width="84" height="124" fill="none" stroke="#D4AF5A" stroke-width=".45"/>
+    ${decoFan(8, 8, 0)}${decoFan(92, 8, 90)}${decoFan(92, 132, 180)}${decoFan(8, 132, 270)}
+    <g fill="#15161C" stroke="#D4AF5A"><circle cx="50" cy="70" r="24" stroke-width="1"/><circle cx="50" cy="70" r="19" stroke-width=".5"/><circle cx="50" cy="70" r="13" stroke-width=".8"/></g>
+    <path d="M50 57L53 67L63 70L53 73L50 83L47 73L37 70L47 67Z" fill="#D4AF5A"/><circle cx="50" cy="70" r="2" fill="#15161C"/>`);
   const BACKS = [
-    { id: 'purple',   name: 'Lilac',    color: '#6750A4', pat: 'lattice' },
-    { id: 'blue',     name: 'Ocean',    color: '#2B5A9E', pat: 'lattice' },
-    { id: 'teal',     name: 'Teal',     color: '#00696B', pat: 'lattice' },
-    { id: 'rose',     name: 'Rose',     color: '#8C4A60', pat: 'stripes' },
-    { id: 'green',    name: 'Baize',    color: '#3A6A3E', pat: 'dots' },
-    { id: 'graphite', name: 'Graphite', color: '#46434F', pat: 'stripes' },
+    { id: 'purple', name: 'Lilac',   color: '#6750A4', pat: 'lattice' },
+    { id: 'rose',   name: 'Rose',    color: '#8C4A60', pat: 'stripes' },
+    { id: 'green',  name: 'Baize',   color: '#3A6A3E', pat: 'dots' },
+    { id: 'red',    name: 'Classic', color: '#FFFFFF', img: CLASSIC_RED },
+    { id: 'royal',  name: 'Royal',   color: '#1C2650', img: ROYAL },
+    { id: 'deco',   name: 'Deco',    color: '#15161C', img: DECO },
   ];
   const PATTERNS = {
     lattice: ['repeating-linear-gradient(45deg, rgba(255,255,255,.16) 0 1px, transparent 1px calc(var(--cw) * .14)), repeating-linear-gradient(-45deg, rgba(255,255,255,.16) 0 1px, transparent 1px calc(var(--cw) * .14))', 'auto'],
     stripes: ['repeating-linear-gradient(135deg, rgba(255,255,255,.13) 0 calc(var(--cw) * .04), transparent calc(var(--cw) * .04) calc(var(--cw) * .11))', 'auto'],
     dots:    ['radial-gradient(circle, rgba(255,255,255,.22) 0 calc(var(--cw) * .025), transparent calc(var(--cw) * .03))', 'calc(var(--cw) * .14) calc(var(--cw) * .14)'],
   };
+  const backLook = b => b.img ? [b.img, '100% 100%'] : PATTERNS[b.pat];
   const prefs = Object.assign({ fill: true, back: 'purple' }, store.get('sp.settings', {}));
-  const backVars = b => `--back:${b.color};--back-img:${PATTERNS[b.pat][0]};--back-size:${PATTERNS[b.pat][1]}`;
+  const backVars = b => `--back:${b.color};--back-img:${backLook(b)[0].replace(/"/g, "'")};--back-size:${backLook(b)[1]}`;
   function applyBack() {
     const b = BACKS.find(x => x.id === prefs.back) || BACKS[0];
     // set on the table, where the card width (--cw) the patterns use is known
     table.style.setProperty('--back', b.color);
-    table.style.setProperty('--back-img', PATTERNS[b.pat][0]);
-    table.style.setProperty('--back-size', PATTERNS[b.pat][1]);
+    table.style.setProperty('--back-img', backLook(b)[0]);
+    table.style.setProperty('--back-size', backLook(b)[1]);
+    table.classList.toggle('fancy-back', !!b.img);
   }
   function drawSettings() {
     const sw = document.getElementById('fillSw');
@@ -749,7 +798,7 @@
     BACKS.forEach(b => {
       const o = document.createElement('button');
       o.className = 'back-opt' + (b.id === prefs.back ? ' on' : '');
-      o.innerHTML = `<div class="sw" style="${backVars(b)};background-color:var(--back);background-image:var(--back-img);background-size:var(--back-size)"></div>${b.name}`;
+      o.innerHTML = `<div class="sw${b.img ? ' fancy' : ''}" style="${backVars(b)};background-color:var(--back);background-image:var(--back-img);background-size:var(--back-size)"></div>${b.name}`;
       o.addEventListener('click', () => { prefs.back = b.id; store.set('sp.settings', prefs); applyBack(); drawSettings(); });
       box.appendChild(o);
     });
